@@ -30,5 +30,7 @@ IMGUI_IMPL_API void     ImGui_ImplDX11_RenderDrawData(ImDrawData* draw_data);
 // Use if you want to reset your rendering device without losing Dear ImGui state.
 IMGUI_IMPL_API void     ImGui_ImplDX11_InvalidateDeviceObjects();
 IMGUI_IMPL_API bool     ImGui_ImplDX11_CreateDeviceObjects();
+IMGUI_IMPL_API bool     ImGuiApp_ImplWin32DX11_CaptureFramebuffer(ImGuiViewport* viewport, int x, int y, int w, int h, unsigned int* pixels_rgba, void* user_data);
+
 
 #endif // #ifndef IMGUI_DISABLE

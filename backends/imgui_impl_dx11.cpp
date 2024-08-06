@@ -735,6 +735,69 @@ static void ImGui_ImplDX11_ShutdownPlatformInterface()
     ImGui::DestroyPlatformWindows();
 }
 
+bool ImGuiApp_ImplWin32DX11_CaptureFramebuffer(ImGuiViewport* viewport, int x, int y, int w, int h, unsigned int* pixels_rgba, void* user_data)
+{
+    IM_UNUSED(user_data);
+    ImGui_ImplDX11_Data* bd = ImGui_ImplDX11_GetBackendData();
+    ID3D11DeviceContext* ctx = bd->pd3dDeviceContext;
+    ImGui_ImplDX11_ViewportData* vd = (ImGui_ImplDX11_ViewportData*)viewport->RendererUserData;
+    ID3D11RenderTargetView* rtView = vd->RTView;
+
+    UINT rtWidth = (UINT)viewport->Size.x;
+    UINT rtHeight = (UINT)viewport->Size.y;
+
+    D3D11_TEXTURE2D_DESC texture_desc;
+    memset(&texture_desc, 0, sizeof(texture_desc));
+    texture_desc.Width = rtWidth;
+    texture_desc.Height = rtHeight;
+    texture_desc.MipLevels = 1;
+    texture_desc.ArraySize = 1;
+    texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texture_desc.SampleDesc.Count = 1;
+    texture_desc.SampleDesc.Quality = 0;
+    texture_desc.Usage = D3D11_USAGE_STAGING;
+    texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+    ID3D11Texture2D* texture = NULL;
+    HRESULT hr = bd->pd3dDevice->CreateTexture2D(&texture_desc, NULL, &texture);
+    if (FAILED(hr))
+    {
+        if (texture)
+        {
+            texture->Release();
+            texture = nullptr;
+        }
+        return false;
+    }
+
+    ID3D11Resource* source = NULL;
+    rtView->GetResource(&source);
+    ctx->CopyResource(texture, source);
+    source->Release();
+
+    D3D11_MAPPED_SUBRESOURCE mapped;
+    mapped.pData = NULL;
+    hr = ctx->Map(texture, 0, D3D11_MAP_READ, 0, &mapped);
+    if (FAILED(hr) || !mapped.pData)
+    {
+        texture->Release();
+        return false;
+    }
+
+    // D3D11 does not provide means to capture a partial screenshot. We copy rect x,y,w,h on CPU side.
+    for (int index_y = y; index_y < y + h; ++index_y)
+    {
+        unsigned int* src = (unsigned int*)((unsigned char*)mapped.pData + index_y * mapped.RowPitch) + x;
+        unsigned int* dst = &pixels_rgba[(index_y - y) * w];
+        memcpy(dst, src, w * 4);
+    }
+
+    ctx->Unmap(texture, 0);
+    texture->Release();
+    return true;
+}
+
+
 //-----------------------------------------------------------------------------
 
 #endif // #ifndef IMGUI_DISABLE
